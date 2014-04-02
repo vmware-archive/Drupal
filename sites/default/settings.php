@@ -523,3 +523,14 @@ $conf['404_fast_html'] = '<html xmlns="http://www.w3.org/1999/xhtml"><head><titl
  * Remove the leading hash signs to disable.
  */
 # $conf['allow_authorize_operations'] = FALSE;
+
+$conf['cache_backends'][] = 'sites/all/modules/varnish/varnish.cache.inc';
+$conf['cache_class_cache_page'] = 'VarnishCache';
+$conf['reverse_proxy'] = TRUE;
+$conf['page_cache_invoke_hooks'] = FALSE;
+$conf['cache'] = 1;
+$conf['cache_lifetime'] = 0;
+$conf['page_cache_maximum_age'] = 21600;
+$conf['reverse_proxy_header'] = 'HTTP_X_FORWARDED_FOR';
+$conf['reverse_proxy_addresses'] = array('10.0.0.60');
+$conf['omit_vary_cookie'] = TRUE;

@@ -1,0 +1,112 @@
+<?php
+
+class StorageAPITestCase extends DrupalWebTestCase {
+  protected $profile = 'testing';
+
+  public static function getInfo() {
+    return array(
+      'name' => 'Storage',
+      'description' => 'Test Storage.',
+      'group' => 'Storage',
+    );
+  }
+
+  function setUp() {
+    parent::setUp('storage');
+
+    $web_user = $this->drupalCreateUser(array('administer storage'));
+    $this->drupalLogin($web_user);
+  }
+
+  function testStorage() {
+    
+    $class = storage_class_load(1);
+    $this->assertNotNull($class, t('Everything class created.'));
+    $this->assertEqual($class->options['initial_container_id'], 1, t('Initial container set.'));
+    
+    $path = storage_new_local_storage_path();
+
+    $container = array(
+      'name' => t('Local2'),
+      'service_id' => 'storage:fs',
+      'settings' => array(
+        'path' => $path,
+        'base_url' => $path,
+      ),
+    );
+
+    $container = storage_container_new($container, FALSE);
+    $container->create();
+    $class->options['initial_container_id'] = $container->container_id;
+    drupal_write_record('storage_class', $class, 'class_id');
+    $class = storage_class_load(1);
+    $this->assertEqual($class->options['initial_container_id'], $container->container_id, t('Initial container changed.'));
+    
+    $selector = storage_selector('storage', 'test');
+    $selector->create();
+    
+    $options = array(
+      'source_uri' => 'modules/simpletest/files/html-1.txt',
+      'get_filename' => TRUE,
+    );
+
+    $storage = $selector->storageAdd($options);
+    $this->assertNotNull($storage, t('Store file.'));
+    
+    $exists = db_select('storage_instance')
+      ->condition('file_id', $storage->file_id)
+      ->condition('container_id', $container->container_id)
+      ->countQuery()
+      ->execute()
+      ->fetchField();
+
+    $this->assertTrue($exists, t('Intial instance exists.'));
+    
+    $this->cronRun();
+
+    $exists = db_select('storage_instance')
+      ->condition('file_id', $storage->file_id)
+      ->condition('container_id', 1)
+      ->countQuery()
+      ->execute()
+      ->fetchField();
+      
+    $this->assertTrue($exists, t('Final instance exists.'));
+
+    $exists = db_select('storage_instance')
+      ->condition('file_id', $storage->file_id)
+      ->condition('container_id', $container->container_id)
+      ->countQuery()
+      ->execute()
+      ->fetchField();
+
+    $this->assertFalse($exists, t('Intial instance removed.'));
+
+    // Create another class.
+    $class2 = new StorageClass(array(
+      'name' => t('AAA'),
+      'options' => array(
+        'redirect' => FALSE,
+        'serve_source_uri' => FALSE,
+      )
+    ));
+
+    $class2->create();
+
+    $selector = storage_selector('storage', 'test2');
+    $selector->create($class->class_id);
+    $this->assertEqual($selector->storageClass()->class_id, $class->class_id, t('Class set when creating selector.'));
+
+    // Only test data URIs if core supports them.
+    if (storage_test_theme_image_data_uri()) {
+      $class->options['data_uri'] = TRUE;
+      $class->update();
+
+      $storage = storage_load($storage->storage_id);
+
+      $output = $storage->serveURL();
+      $expected = 'data:text/plain;charset=us-ascii;base64,PGgxPlNpbXBsZVRlc3QgSFRNTDwvaDE+';
+      $this->assertEqual($output, $expected, t('Correct data URI created.'));
+    }
+  }
+}

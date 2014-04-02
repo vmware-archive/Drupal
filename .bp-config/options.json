@@ -1,3 +1,4 @@
 {
-    "PHP_EXTENSIONS": [ "bz2", "zlib", "curl", "mcrypt", "gd"]
+    "PHP_EXTENSIONS": [ "bz2", "zlib", "curl", "mcrypt", "gd"],
+	"DOWNLOAD_URL": "http://10.0.0.57"
 }

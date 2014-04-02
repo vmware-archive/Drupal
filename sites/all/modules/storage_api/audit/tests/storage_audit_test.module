@@ -1,0 +1,20 @@
+<?php
+
+/**
+ * @file
+ * Dummy module implementing Storage Audit hooks.
+ */
+
+/**
+ * Implements hook_storage_audit_import_container().
+ */
+function storage_audit_test_storage_audit_import_container(StorageContainer $container) {
+  return 'storage_audit_test:test';
+}
+
+/**
+ * Implements hook_storage_audit_import().
+ */
+function storage_audit_test_storage_audit_import(Storage $storage) {
+  variable_set('storage_audit_test_storage', $storage->storage_id);
+}

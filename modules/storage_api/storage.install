@@ -1,0 +1,267 @@
+<?php
+
+
+/**
+ * Implements hook_requirements() .
+ */
+function storage_requirements($phase) {
+  $curl = FALSE;
+
+  if (function_exists('curl_version')) {
+    $curl = curl_version();
+  }
+  
+  $t = get_t();
+  $description = $t('Storage requires that <a href="http://php.net/manual/en/book.curl.php">cURL</a> be available to PHP.');
+
+  $requirements = array(
+    'storage_curl' => array(
+      'title' => 'Storage - cURL',
+      'value' => ($curl ? $curl['version'] : 'Not found'),
+      'description' => $curl ? NULL : $description,
+      'severity' => $curl ? REQUIREMENT_OK : REQUIREMENT_ERROR,
+    ),
+  );
+  
+  if ($phase == 'runtime') {
+    if (extension_loaded('fileinfo')) {
+      $finfo = @finfo_open(FILEINFO_MIME);
+    
+      if ($finfo !== FALSE) {
+        $value = t("Fileinfo PHP extension");
+      }
+    }
+    
+    if (!isset($value)) {
+      exec('file', $output, $result);
+      
+      if ($result != 127) {
+        $value = t("Unix 'file' command");
+      }
+      else {
+        $value = t("Filename extension mapping");
+      }
+    }
+
+    $requirements['storage_mime'] = array(
+      'title' => t('Storage - MIME detection'),
+      'value' => $value,
+      'severity' => REQUIREMENT_OK,
+    );
+
+    $data_uri_enabled = storage_test_theme_image_data_uri();
+
+    $requirements['storage_data_uri'] = array(
+      'title' => t('Storage - data URIs'),
+      'value' => $data_uri_enabled ? t("Supported") : t("Unsupported") . ' ' . t("(see !link)", array('!link' => storage_data_uri_doc_link())),
+      'severity' => $data_uri_enabled ? REQUIREMENT_OK : REQUIREMENT_WARNING,
+    );
+
+    $services = storage_service_info();
+  
+    // Get service_ids of all containers.
+    $service_ids = db_select('storage_container')
+      ->fields('storage_container', array('service_id'))
+      ->groupBy('service_id')
+      ->execute()
+      ->fetchCol();
+      
+    foreach ($service_ids as $service_id) {
+      $service = storage_service_load($service_id);
+
+      try {
+        $service->check();
+      }
+      catch (Exception $e) {
+      
+        $requirements['storage_' . $service_id] = array(
+          'title' => t('Storage - ') . $services[$service_id]['name'] . t(' service'),
+          'value' => t('Not configured'),
+          'description' => $e->getMessage(),
+          'severity' => REQUIREMENT_ERROR,
+        );
+      }
+    }
+  }
+  
+  return $requirements;
+}
+
+
+/**
+ * Implements hook_schema().
+ */
+function storage_schema() {
+  $schema = array();
+
+  /*
+   * Configuration.
+   */
+
+  $schema['storage_container'] = array(
+    'fields' => array(
+      'container_id' => array('type' => 'serial', 'unsigned' => TRUE, 'not null' => TRUE),
+      'service_id' => array(
+        'type' => 'varchar', 'length' => 255, 'not null' => TRUE,
+        'mysql_type' => 'varchar(255) CHARACTER SET ascii COLLATE ascii_bin',
+      ),
+      'name' => array(
+        'type' => 'varchar', 'length' => 255, 'not null' => TRUE,
+        'mysql_type' => 'varchar(255) CHARACTER SET utf8 COLLATE utf8_bin',
+      ),
+      'access_control' => array('type' => 'int', 'size' => 'tiny', 'not null' => TRUE, 'default' => 0),
+      'external' => array('type' => 'int', 'size' => 'tiny', 'not null' => TRUE, 'default' => 0),
+      'status' => array('type' => 'int', 'size' => 'tiny', 'not null' => TRUE, 'default' => 0),
+      'settings' => array('type' => 'blob', 'not null' => TRUE, 'serialize' => TRUE),
+    ),
+    'primary key' => array('container_id'),
+  );
+
+  $schema['storage_class'] = array(
+    'fields' => array(
+      'class_id' => array('type' => 'serial', 'unsigned' => TRUE, 'not null' => TRUE),
+      'name' => array(
+        'type' => 'varchar', 'length' => 255, 'not null' => TRUE,
+        'mysql_type' => 'varchar(255) CHARACTER SET utf8 COLLATE utf8_bin',
+      ),
+      'options' => array('type' => 'blob', 'not null' => TRUE, 'serialize' => TRUE),
+    ),
+    'primary key' => array('class_id'),
+  );
+
+  $schema['storage_class_container'] = array(
+    'fields' => array(
+      'class_id' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE),
+      'container_id' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE),
+      'weight' => array('type' => 'int', 'not null' => TRUE, 'default' => 0),
+      'propagate' => array('type' => 'int', 'size' => 'tiny', 'not null' => TRUE, 'default' => 1),
+      'serving' => array('type' => 'int', 'size' => 'tiny', 'not null' => TRUE, 'default' => 1),
+      'remove' => array('type' => 'int', 'size' => 'tiny', 'not null' => TRUE, 'default' => 0),
+    ),
+    'primary key' => array('class_id', 'container_id'),
+  );
+
+  $schema['storage_selector'] = array(
+    'fields' => array(
+      'selector_id' => array(
+        'type' => 'varchar', 'length' => 255, 'not null' => TRUE,
+        'mysql_type' => 'varchar(255) CHARACTER SET ascii COLLATE ascii_bin',
+      ),
+      'class_id' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE),
+      'migrating' => array('type' => 'int', 'size' => 'tiny', 'not null' => TRUE, 'default' => 0),
+    ),
+    'primary key' => array('selector_id', 'class_id'),
+  );
+
+
+  /*
+   * Content.
+   */
+
+  $schema['storage_file'] = array(
+    'fields' => array(
+      'file_id' => array('type' => 'serial', 'unsigned' => TRUE, 'not null' => TRUE),
+      'whirlpool' => array(
+        'type' => 'blob', 'length' => 64, 'not null' => TRUE,
+        'mysql_type' => 'BINARY(64)',
+      ),
+      'filename' => array(
+        'type' => 'varchar', 'length' => 255, 'not null' => TRUE,
+        'mysql_type' => 'varchar(255) CHARACTER SET utf8 COLLATE utf8_bin',
+      ),
+      'size' => array('type' => 'int', 'unsigned' => TRUE, 'size' => 'big', 'not null' => TRUE),
+      'mimetype' => array(
+        'type' => 'varchar', 'length' => 255, 'not null' => TRUE,
+        'mysql_type' => 'varchar(255) CHARACTER SET ascii COLLATE ascii_bin',
+      ),
+      'md5' => array(
+        'type' => 'blob', 'length' => 16, 'not null' => TRUE,
+        'mysql_type' => 'BINARY(16)',
+      ),
+    ),
+    'primary key' => array('file_id'),
+    'unique keys' => array(
+      'fingerprint' => array('whirlpool', 'filename'),
+    ),
+  );
+  
+  $schema['storage'] = array(
+    'fields' => array(
+      'storage_id' => array('type' => 'serial', 'unsigned' => TRUE, 'not null' => TRUE),
+      'selector_id' => array(
+        'type' => 'varchar', 'length' => 255,
+        'mysql_type' => 'varchar(255) CHARACTER SET ascii COLLATE ascii_bin',
+      ),
+      'parent_id' => array('type' => 'int', 'unsigned' => TRUE),
+      'file_id' => array('type' => 'int', 'unsigned' => TRUE),
+      'created' => array('type' => 'int', 'unsigned' => TRUE),
+      'source_uri' => array(
+        'type' => 'varchar', 'length' => 4095, 'not null' => TRUE, 'default' => '',
+        'mysql_type' => 'varchar(4095) CHARACTER SET utf8 COLLATE utf8_bin',
+      ),
+      'initial_container_id' => array('type' => 'int', 'unsigned' => TRUE),
+      'data' => array('type' => 'blob', 'not null' => TRUE, 'serialize' => TRUE),
+      'status' => array('type' => 'int', 'size' => 'tiny', 'not null' => TRUE, 'default' => 1),
+      'serving_container' => array('type' => 'blob', 'serialize' => TRUE),
+    ),
+    'primary key' => array('storage_id'),
+    'indexes' => array(
+      'parent_id' => array('parent_id'),
+      'status' => array('status'),
+    ),
+  );
+
+  $schema['storage_instance'] = array(
+    'fields' => array(
+      'container_id' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE),
+      'reference' => array(
+        'type' => 'varchar', 'length' => 255, 'not null' => TRUE,
+        'mysql_type' => 'varchar(255) CHARACTER SET utf8 COLLATE utf8_bin',
+      ),
+      'file_id' => array('type' => 'int', 'unsigned' => TRUE),
+    ),
+    'primary key' => array('container_id', 'reference'),
+    'unique keys' => array(
+      'file_id' => array('container_id', 'file_id'),
+    ),
+  );
+  
+  return $schema;
+}
+
+
+/**
+ * Implements hook_install() .
+ */
+function storage_install() {
+
+  // Create a class.
+  $class = new StorageClass(array(
+    'name' => t('Everything'), 
+    'options' => array()
+  ));
+  
+  $class->create();
+
+  $path = storage_new_local_storage_path();
+
+  $container = array(
+    'service_id' => 'storage:fs',
+    'settings' => array(
+      'path' => $path,
+      'base_url' => $path,
+    ),
+  );
+
+  try {
+    $container = storage_container_new($container, FALSE);
+    $container->create();
+  }
+  catch (Exception $e) {
+    drupal_set_message($e->getMessage(), 'error');
+    return;
+  }
+  
+  $class->addContainer($container);
+}
+

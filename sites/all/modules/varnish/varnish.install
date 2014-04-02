@@ -1,0 +1,18 @@
+<?php
+
+/**
+ * @file
+ * Updates for the varnish module.
+ */
+
+/**
+ * Changes the varnish_legacy variable to a varnish_version variable
+ * that is a little more flexible.
+ */
+function varnish_update_6100(&$sandbox) {
+  $legacy = variable_get('varnish_legacy', 0);
+  if ($legacy) {
+    variable_set('varnish_version', 2.0);
+  }
+  return array();
+}

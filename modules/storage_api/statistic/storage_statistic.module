@@ -1,0 +1,36 @@
+<?php
+
+
+/**
+ * Implements hook_storage_serving()
+ */
+function storage_statistic_storage_serving(Storage $storage, StorageContainerInterface $container = NULL) {
+  global $user;
+
+  $statistic = array(
+    'storage_id' => $storage->storage_id,
+    'size' => $storage->size,
+    'uid' => $user->uid,
+    'sid' => session_id(),
+    'ip_address' => ip_address(),
+    'timestamp' => REQUEST_TIME,
+    'referrer' => substr($_SERVER['HTTP_REFERER'], 0, 4095),
+  );
+
+  if ($container) {
+    $statistic['container_id'] = $container->container_id;
+  }
+
+  drupal_write_record('storage_statistic', $statistic);
+}
+
+
+/**
+ * Implements hook_cron()
+ */
+function storage_statistic_cron() {
+
+  db_delete('storage_statistic')
+    ->condition('timestamp', time() - variable_get('statistics_flush_accesslog_timer', 259200), '<')
+    ->execute();
+}

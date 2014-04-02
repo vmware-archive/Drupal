@@ -1,0 +1,13 @@
+name = "Audit"
+description = "Performs audits of storage containers."
+package = "Storage API"
+dependencies[] = storage
+core = 7.x
+files[] = storage_audit.test
+
+; Information added by drupal.org packaging script on 2013-04-09
+version = "7.x-1.5"
+core = "7.x"
+project = "storage_api"
+datestamp = "1365469221"
+

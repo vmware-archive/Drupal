@@ -1,0 +1,29 @@
+<?php
+
+
+/**
+ * Implements hook_schema()
+ */
+function storage_statistic_schema() {
+
+  $schema['storage_statistic'] = array(
+    'fields' => array(
+      'timestamp' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE),
+      'storage_id' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE),
+      'container_id' => array('type' => 'int', 'unsigned' => TRUE),
+      'size' => array('type' => 'int', 'unsigned' => TRUE, 'size' => 'big', 'not null' => TRUE),
+      'uid' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE),
+      'sid' => array('type' => 'varchar', 'length' => 128, 'not null' => TRUE),
+      'ip_address' => array(
+        'type' => 'varchar', 'length' => 39, 'not null' => TRUE,
+        'mysql_type' => 'varchar(39) CHARACTER SET ascii COLLATE ascii_bin',
+      ),
+      'referrer' => array(
+        'type' => 'varchar', 'length' => 4095, 'not null' => TRUE,
+        'mysql_type' => 'varchar(4095) CHARACTER SET utf8 COLLATE utf8_bin',
+      ),
+    ),
+  );
+
+  return $schema;
+}

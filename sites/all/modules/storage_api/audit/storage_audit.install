@@ -1,0 +1,27 @@
+<?php
+
+/**
+ * Implement hook_install().
+ */
+function storage_audit_install() {
+
+  $spec = array('type' => 'int', 'size' => 'tiny', 'not null' => TRUE, 'default' => STORAGE_AUDIT_STATUS_AUDITED);
+  db_add_field('storage_instance', 'audit', $spec);
+}
+
+/**
+ * Implement hook_uninstall().
+ */
+function storage_audit_uninstall() {
+
+  db_drop_field('storage_instance', 'audit');
+}
+
+/**
+ * Implement hook_schema_alter().
+ */
+function storage_audit_schema_alter(array &$schema) {
+
+  $schema['storage_instance']['fields']['audit'] = array('type' => 'int', 'size' => 'tiny', 'not null' => TRUE,
+    'default' => STORAGE_AUDIT_STATUS_AUDITED);
+}
