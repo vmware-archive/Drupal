@@ -1,0 +1,13 @@
+---
+applications:
+- name: drupal
+  memory: 256M 
+  instances: 1
+  host: drupal
+  domain: cloudfoundry.dyndns.org
+  path: .
+  buildpack: https://github.com/azwickey-pivotal/cf-php-build-pack.git
+  #buildpack: https://github.com/dmikusa-pivotal/cf-php-build-pack.git
+  services:
+  - drupal-db
+  #- cloud-nfs

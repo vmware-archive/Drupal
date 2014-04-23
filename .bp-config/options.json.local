@@ -1,6 +1,4 @@
 {
     "PHP_EXTENSIONS": [ "bz2", "zlib", "curl", "mcrypt", "gd", "memcache"],
-    "DOWNLOAD_URL": "http://10.0.0.1:8080/cf-php-buildpack",
-    "HTTPD_VERSION": "2.4.7",
     "PHP_MODULES": [ "pear"]
 }

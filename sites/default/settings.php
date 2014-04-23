@@ -531,6 +531,19 @@ $conf['page_cache_invoke_hooks'] = FALSE;
 $conf['cache'] = 1;
 $conf['cache_lifetime'] = 0;
 $conf['page_cache_maximum_age'] = 21600;
-$conf['reverse_proxy_header'] = 'HTTP_X_FORWARDED_FOR';
-$conf['reverse_proxy_addresses'] = array('10.0.0.60');
+#$conf['reverse_proxy_header'] = 'HTTP_X_FORWARDED_FOR';
+#$conf['reverse_proxy_addresses'] = array('10.0.0.60');
 $conf['omit_vary_cookie'] = TRUE;
+
+#$conf['cache_backends'][] = 'sites/all/modules/memcache/memcache.inc';
+#$conf['cache_default_class'] = 'MemCacheDrupal';
+#$conf['cache_class_cache_form'] = 'DrupalDatabaseCache';
+
+#$conf['memcache_servers'] = array(
+#  '10.0.0.61:11211' => 'cluster1',
+#  '10.0.0.62:11211' => 'cluster1'
+# );
+
+#$conf['memcache_bins'] = array(
+#  'cache' => 'cluster1'
+#);
