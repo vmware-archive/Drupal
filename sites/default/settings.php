@@ -524,26 +524,51 @@ $conf['404_fast_html'] = '<html xmlns="http://www.w3.org/1999/xhtml"><head><titl
  */
 # $conf['allow_authorize_operations'] = FALSE;
 
-$conf['cache_backends'][] = 'sites/all/modules/varnish/varnish.cache.inc';
-$conf['cache_class_cache_page'] = 'VarnishCache';
-$conf['reverse_proxy'] = TRUE;
-$conf['page_cache_invoke_hooks'] = FALSE;
-$conf['cache'] = 1;
-$conf['cache_lifetime'] = 0;
-$conf['page_cache_maximum_age'] = 21600;
-#$conf['reverse_proxy_header'] = 'HTTP_X_FORWARDED_FOR';
-#$conf['reverse_proxy_addresses'] = array('10.0.0.60');
-$conf['omit_vary_cookie'] = TRUE;
 
-#$conf['cache_backends'][] = 'sites/all/modules/memcache/memcache.inc';
-#$conf['cache_default_class'] = 'MemCacheDrupal';
-#$conf['cache_class_cache_form'] = 'DrupalDatabaseCache';
+# Pull User Provided Services credentials out of VCAP_SERVICES env
+$ups_config = $services_json["user-provided"];
+foreach ($ups_config as $ups) {
+	$ups_name = $ups["name"];
+	if ($ups_name == "drupal-varnish") {
+		$varnish_creds = $ups["credentials"];
+	} else if ($ups_name == "drupal-memcached") {
+		$memcached_creds = $ups["credentials"];
+	}
+}
 
-#$conf['memcache_servers'] = array(
-#  '10.0.0.61:11211' => 'cluster1',
-#  '10.0.0.62:11211' => 'cluster1'
-# );
+/**
+* Varnish configuration
+**/
+if (isset($varnish_creds))	{
+	$conf['cache_backends'][] = 'sites/all/modules/varnish/varnish.cache.inc';
+	$conf['cache_class_cache_page'] = 'VarnishCache';
+	$conf['reverse_proxy'] = TRUE;
+	$conf['page_cache_invoke_hooks'] = FALSE;
+	$conf['cache'] = 1;
+	$conf['cache_lifetime'] = 0;
+	$conf['page_cache_maximum_age'] = 21600;
+	$conf['reverse_proxy_header'] = 'HTTP_X_FORWARDED_FOR';
+	$conf['reverse_proxy_addresses'] = explode(",", $varnish_creds["cluster"]);
+	$conf['omit_vary_cookie'] = TRUE;
+}
 
-#$conf['memcache_bins'] = array(
-#  'cache' => 'cluster1'
-#);
+/**
+* Memcached configuration
+**/
+if (isset($memcached_creds))	{
+	$conf['cache_backends'][] = 'sites/all/modules/memcache/memcache.inc';
+	$conf['cache_default_class'] = 'MemCacheDrupal';
+	$conf['cache_class_cache_form'] = 'DrupalDatabaseCache';
+
+	$memcached_cluster = explode(",", $memcached_creds["cluster"]);
+	$mem_servers = array();
+	foreach ($memcached_cluster as $server) {
+		$mem_servers[$server] = "cluster1";
+	}
+
+	#echo "Servers: " " . $mem_servers;
+	$conf['memcache_servers'] = $mem_servers;
+	$conf['memcache_bins'] = array(
+	  'cache' => 'cluster1'
+	);
+}

@@ -2,9 +2,9 @@
 applications:
 - name: drupal
   memory: 256M 
-  instances: 1
+  instances: 2
   host: drupal
-  domain: cloudfoundry-dev.ebiz.verizon.com
+  domain: cloudfoundry.dyndns.org
   path: .
   services:
   - drupal-db
