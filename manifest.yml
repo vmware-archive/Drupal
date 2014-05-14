@@ -8,3 +8,5 @@ applications:
   path: .
   services:
   - drupal-db
+  - drupal-varnish
+  - drupal-memcached

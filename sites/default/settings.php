@@ -572,3 +572,8 @@ if (isset($memcached_creds))	{
 	  'cache' => 'cluster1'
 	);
 }
+
+$conf['aws_key'] = 'Q21RTGNPKQYLM8GPPIFR';
+$conf['aws_secret'] = 'opCloyb5RHQ1RfRfXAub4Xl2BMr9IISaMMGePQ==';
+$conf['amazons3_hostname'] = 'riak-cs.dyndns.org:8080';
+$conf['amazons3_bucket'] = 'drupal';
