@@ -1,0 +1,42 @@
+<?php
+
+class StorageAuditTestCase extends DrupalWebTestCase {
+  protected $profile = 'testing';
+
+  public static function getInfo() {
+    return array(
+      'name' => 'Storage Audit',
+      'description' => 'Test Storage Audit.',
+      'group' => 'Storage',
+    );
+  }
+
+  function setUp() {
+    parent::setUp('storage', 'storage_audit', 'storage_audit_test');
+
+    $web_user = $this->drupalCreateUser(array('administer storage'));
+    $this->drupalLogin($web_user);
+  }
+
+  function testStorageAudit() {
+    $container = storage_container_load(1);
+
+    $files = storage_audit($container);
+    $this->assertEqual($files, 0, t("No files found in container."));
+
+    file_unmanaged_copy('CHANGELOG.txt', $container->settings['path']);
+    $files = storage_audit($container);
+    $this->assertEqual($files, 1, t("One file found in container."));
+  }
+
+  function testStorageAuditImport() {
+    $container = storage_container_load(1);
+    file_unmanaged_copy('CHANGELOG.txt', $container->settings['path']);
+   
+    $this->drupalPost('admin/structure/storage/container/1/audit', array(), t("Audit"));
+
+    $storage = storage_load(variable_get('storage_audit_test_storage'));
+    $this->assertEqual($storage->selector_id, 'storage_audit_test:test', t("Storage has correct selector."));
+    $this->assertEqual($storage->filename, 'CHANGELOG.txt', t("Storage has correct filename."));
+  }
+}

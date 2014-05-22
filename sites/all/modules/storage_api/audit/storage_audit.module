@@ -1,0 +1,345 @@
+<?php
+
+/**
+ * The instance is missing.
+ */
+define('STORAGE_AUDIT_STATUS_MISSING', 0);
+
+/**
+ * The instance is audited.
+ */
+define('STORAGE_AUDIT_STATUS_AUDITED', 1);
+
+/**
+ * The instance is invalid.
+ */
+define('STORAGE_AUDIT_STATUS_INVALID', 2);
+
+/**
+ * Implements hook_menu().
+ */
+function storage_audit_menu() {
+
+  $items['admin/structure/storage/container/%storage_container_menu/audit'] = array(
+    'title' => "Audit",
+    'access arguments' => array('administer storage'),
+    'type' => MENU_LOCAL_TASK,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('storage_audit_form', 4),
+    'weight' => 1,
+    'file' => 'admin.inc',
+  );
+
+  return $items;
+}
+
+function _storage_audit_unset_audited($container_id) {
+
+  $audited = variable_get('storage_audit_audited', array());
+  unset($audited[$container_id]);
+  variable_set('storage_audit_audited', $audited);
+}
+
+function _storage_audit_set_audited($container_id) {
+
+  $audited = variable_get('storage_audit_audited');
+  $audited[$container_id] = time();
+  variable_set('storage_audit_audited', $audited);
+}
+
+function _storage_audit_get_audited($container_id) {
+
+  $audited = variable_get('storage_audit_audited');
+  
+  return isset($audited[$container_id]) ? $audited[$container_id] : NULL;
+}
+
+function _storage_audit_prepare(StorageContainer $container) {
+  // Mark this container as unaudited.
+  _storage_audit_unset_audited($container->container_id);
+
+  // Delete records of extra instances discovered during previous audit.
+  db_delete('storage_instance')
+    ->condition('container_id', $container->container_id)
+    ->isNull('file_id')
+    ->execute();
+
+  // Set every instance record in container to unaudited.
+  db_update('storage_instance')
+    ->fields(array(
+        'audit' => STORAGE_AUDIT_STATUS_MISSING,
+      ))
+    ->condition('container_id', $container->container_id)
+    ->execute();
+}
+
+function _storage_audit_import(StorageContainerInterface $container, $reference, array $info) {
+  $selector_ids = module_invoke_all('storage_audit_import_container', $container);
+
+  if (!count($selector_ids)) {
+    throw new StorageException();
+  }
+
+  $uri = isset($info['uri']) ? $info['uri'] : $container->serviceInstanceGetUri($reference);
+
+  $file_id = _storage_file_id($uri, $reference);
+
+  db_insert('storage_instance')
+    ->fields(array(
+      'container_id' => $container->container_id,
+      'reference' => $reference,
+      'file_id' => $file_id,
+    ))
+    ->execute();
+
+  $options = array(
+    'file_id' => $file_id,
+    'source_uri' => $uri,
+  );
+
+  foreach ($selector_ids as $selector_id) {
+    $selector = storage_selector($selector_id);
+    $storage = $selector->storageAdd($options);
+
+    module_invoke($selector->module(), 'storage_audit_import', $storage);
+  }
+}
+
+function _storage_audit_instance(array $instance, array $info) {
+
+  if (isset($info['whirlpool'])) {
+    if ($instance['whirlpool'] == $info['whirlpool']) {
+      return STORAGE_AUDIT_STATUS_AUDITED;
+    }
+  }
+  elseif (isset($info['md5'])) {
+    if ($instance['md5'] == $info['md5']) {
+      return STORAGE_AUDIT_STATUS_AUDITED;
+    }
+  }
+
+  return STORAGE_AUDIT_STATUS_INVALID;
+}
+
+function _storage_audit_file(StorageContainerInterface $container, $reference, array $info) {
+  $transaction = db_transaction();
+
+  $query = db_select('storage_instance');
+  $query->join('storage_file', NULL, 'storage_instance.file_id = storage_file.file_id');
+
+  $instance = $query->fields('storage_file')
+    ->condition('storage_instance.container_id', $container->container_id)
+    ->condition('storage_instance.reference', $reference)
+    ->execute()
+    ->fetchAssoc();
+
+  if ($instance === FALSE) {
+    // There is no record of this instance - see if a module will claim it.
+    try {
+      _storage_audit_import($container, $reference, $info);
+    }
+    catch (StorageException $e) {
+      db_insert('storage_instance')
+        ->fields(array(
+          'container_id' => $container->container_id,
+          'reference' => $reference,
+        ))
+        ->execute();
+    }
+  }
+  else {
+    db_update('storage_instance')
+      ->fields(array(
+        'audit' => _storage_audit_instance($instance, $info),
+      ))
+      ->condition('container_id', $container->container_id)
+      ->condition('reference', $reference)
+      ->execute();
+  }
+}
+
+function _storage_audit(StorageContainer $container, array &$sandbox, &$finished) {
+  $manifest = $container->serviceManifest($sandbox, $finished);
+  $files = 0;
+
+  foreach ($manifest as $reference => $info) {
+    // If the file is called .htaccess and this container is supposed to have a
+    // .htaccess file, then just ignore it.
+    if ($reference == '.htaccess' && $container->service()->htaccess) {
+      continue;
+    }
+
+    _storage_audit_file($container, $reference, $info);
+    $files++;
+  }
+
+  return $files;
+}
+
+function storage_audit(StorageContainer $container) {
+  _storage_audit_prepare($container);
+  $sandbox = array();
+  $files = 0;
+
+  do {
+    $files += _storage_audit($container, $sandbox, $finished);
+  }
+  while (!$finished);
+
+  return $files;
+}
+
+function storage_audit_batch(StorageContainerInterface $container, array &$context) {
+  if (!isset($context['sandbox']['progress'])) {
+    $context['sandbox']['service_sandbox'] = array();
+    $context['sandbox']['files'] = 0;
+    $context['sandbox']['max'] = db_select('storage_instance')
+      ->condition('container_id', $container->container_id)
+      ->isNotNull('file_id')
+      ->countQuery()
+      ->execute()
+      ->fetchField();
+
+    _storage_audit_prepare($container);
+  }
+  
+  $context['sandbox']['files'] += _storage_audit($container, $context['sandbox']['service_sandbox'], $finished);
+
+  $context['message'] = $context['sandbox']['files'] . ' / ' . 
+    format_plural($context['sandbox']['max'], "1 file audited.", "@count files audited.");
+
+  if ($finished) {
+    _storage_audit_set_audited($container->container_id);
+    $context['finished'] = 1;
+    drupal_set_message(format_plural($context['sandbox']['files'], "1 file audited.", "@count files audited."));
+  }
+  else {
+    if ($context['sandbox']['files'] < $context['sandbox']['max']) {
+      $context['sandbox']['progress'] = $context['sandbox']['files'];
+    }
+    else {
+      $context['sandbox']['progress'] = $context['sandbox']['max'] - 1;
+    }
+    
+    $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['max'];
+  }
+}
+
+function _storage_audit_repair(StorageContainerInterface $container, array $instance, array &$results) {
+  // Make sure we don't delete anything we shouldn't.
+  if ($instance['file_id']) {
+    try {
+      $info = $container->serviceInstanceCheck($instance['reference']);
+    }
+    catch (StorageException $e) {}
+    
+    if (isset($info) && _storage_audit_instance($instance, $info) == STORAGE_AUDIT_STATUS_AUDITED) {
+
+      db_update('storage_instance')
+        ->fields(array(
+            'audit' => STORAGE_AUDIT_STATUS_AUDITED,
+          ))
+        ->condition('container_id', $container->container_id)
+        ->condition('reference', $instance['reference'])
+        ->execute();
+        
+      return;
+    }
+  }
+
+  // Delete instances that shouldn't exist or are corrupt.
+  if (!$container->external && $instance['audit'] != STORAGE_AUDIT_STATUS_MISSING) {
+    $container->serviceInstanceDestroy($instance['reference']);
+    $results['instances']++;
+  }
+  
+  // Delete the record.
+  db_delete('storage_instance')
+    ->condition('container_id', $container->container_id)
+    ->condition('reference', $instance['reference'])
+    ->execute();
+    
+  // Attempt to fix the damage.
+  if ($instance['file_id']) {
+    db_update('storage')
+      ->fields(array(
+          'status' => STORAGE_STATUS_PROCESS_CRON,
+        ))
+      ->expression('serving_container', 'NULL')
+      ->condition('file_id', $instance['file_id'])
+      ->execute();
+      
+    $storage_ids = db_select('storage')
+      ->fields('storage', array('storage_id'))
+      ->condition('file_id', $instance['file_id'])
+      ->orderBy('storage_id')
+      ->execute()
+      ->fetchCol();
+
+    foreach ($storage_ids as $storage_id) {
+
+      try {
+        $container->ensureInstanceExists(storage_load($storage_id));
+      }
+      catch (StorageException $e) {
+        continue;
+      }
+
+      $results['recovered']++;
+    }
+
+    $results['records']++;
+  }
+}
+
+function storage_audit_repair_batch(StorageContainerInterface $container, array &$context) {
+  if (!isset($context['sandbox']['progress'])) {
+    $context['sandbox']['progress'] = 0;
+    $context['results']['records'] = 0;
+    $context['results']['instances'] = 0;
+    $context['results']['recovered'] = 0;
+    $context['sandbox']['max'] = db_select('storage_instance')
+      ->condition('container_id', $container->container_id)
+      ->condition(db_or()
+        ->isNull('storage_instance.file_id')
+        ->condition('storage_instance.audit', STORAGE_AUDIT_STATUS_AUDITED, '<>')
+      )
+      ->countQuery()
+      ->execute()
+      ->fetchField();
+  }
+  
+  $query = db_select('storage_instance', NULL, array('fetch' => PDO::FETCH_ASSOC));
+  $query->leftJoin('storage_file', NULL, 'storage_instance.file_id = storage_file.file_id');
+
+  $result = $query->fields('storage_instance')
+    ->fields('storage_file')
+    ->condition('storage_instance.container_id', $container->container_id)
+    ->condition(db_or()
+      ->isNull('storage_instance.file_id')
+      ->condition('storage_instance.audit', STORAGE_AUDIT_STATUS_AUDITED, '<>')
+    )
+    ->execute();
+
+  foreach ($result as $instance) {
+    _storage_audit_repair($container, $instance, $context['results']);
+    
+    $context['sandbox']['progress']++;
+    $context['message'] = $context['sandbox']['progress'] . ' / ' .
+      format_plural($context['sandbox']['max'], "1 file repaired.", "@count files repaired.");
+  }
+  
+  if ($context['sandbox']['progress'] == $context['sandbox']['max']) {
+    $context['finished'] = 1;
+    
+    drupal_set_message(format_plural($context['results']['records'], 
+      "1 file record deleted.", "@count file records deleted."));
+    drupal_set_message(format_plural($context['results']['instances'], 
+      "1 file instance deleted.", "@count file instances deleted."));
+    drupal_set_message(format_plural($context['results']['recovered'],
+      "1 file recovered.", "@count files recovered."));
+  }
+  else {
+    $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['max'];
+  }
+}

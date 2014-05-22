@@ -1,0 +1,26 @@
+name = "Storage"
+description = "Provides an advanced API for managed file storage and serving."
+package = "Storage API"
+core = 7.x
+files[] = storage.module
+files[] = storage.test
+files[] = service.inc
+files[] = container.inc
+files[] = class.inc
+files[] = selector.inc
+files[] = storage.inc
+
+files[] = services/db.inc
+files[] = services/fs.inc
+files[] = services/ftp.inc
+files[] = services/rackspace.inc
+files[] = services/s3.inc
+
+configure = admin/structure/storage
+
+; Information added by drupal.org packaging script on 2013-04-09
+version = "7.x-1.5"
+core = "7.x"
+project = "storage_api"
+datestamp = "1365469221"
+

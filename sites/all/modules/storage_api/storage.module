@@ -1,0 +1,811 @@
+<?php
+
+/**
+ * The storage is idle.
+ */
+define('STORAGE_STATUS_IDLE', 0);
+
+/**
+ * The storage is to be processed during cron.
+ */
+define('STORAGE_STATUS_PROCESS_CRON', 1);
+
+/**
+ * The storage container is active.
+ */
+define('STORAGE_CONTAINER_STATUS_ACTIVE', 0);
+
+/**
+ * The storage container is suspended.
+ */
+define('STORAGE_CONTAINER_STATUS_SUSPENDED', 1);
+
+/**
+ * The storage container is being destroyed.
+ */
+define('STORAGE_CONTAINER_STATUS_DESTROY', 2);
+
+class StorageException extends Exception {}
+
+/**
+ * Implements hook_permission().
+ */
+function storage_permission() {
+
+  return array('administer storage' => array(
+    'title' => t('Administer storage'),
+//    'description' => t(''),
+  ));
+}
+
+
+/**
+ * Implements hook_menu().
+ */
+function storage_menu() {
+
+  $items['system/storage/serve/%storage_menu'] = array(
+    'type' => MENU_CALLBACK,
+    'page callback' => 'storage_serve',
+    'page arguments' => array(3),
+    'access callback' => 'storage_access',
+    'access arguments' => array(3),
+  );
+
+  $items['admin/structure/storage'] = array(
+    'title' => "File storage",
+    'access arguments' => array('administer storage'),
+    'description' => "Manage classes and containers for file storage and serving.",
+    'page callback' => 'storage_admin',
+    'file' => 'storage.admin.inc',
+  );
+
+  $items['admin/structure/storage/create-class'] = array(
+    'title' => "Create class",
+    'access arguments' => array('administer storage'),
+    'type' => MENU_LOCAL_ACTION,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('storage_create_class_form'),
+    'weight' => 1,
+    'file' => 'class.admin.inc',
+  );
+
+  $items['admin/structure/storage/class/%storage_class_menu'] = array(
+    'title callback' => 'storage_class_title',
+    'title arguments' => array(4),
+    'access arguments' => array('administer storage'),
+    'page callback' => 'storage_class',
+    'page arguments' => array(4),
+    'file' => 'class.admin.inc',
+  );
+
+  $items['admin/structure/storage/class/%storage_class_menu/view'] = array(
+    'title' => "View",
+    'access arguments' => array('administer storage'),
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => 0,
+    'file' => 'class.admin.inc',
+  );
+
+  $items['admin/structure/storage/class/%storage_class_menu/edit'] = array(
+    'title' => "Edit",
+    'access arguments' => array('administer storage'),
+    'type' => MENU_LOCAL_TASK,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('storage_class_edit_form', 4),
+    'weight' => 1,
+    'file' => 'class.admin.inc',
+  );
+
+  $items['admin/structure/storage/class/%storage_class_menu/delete'] = array(
+    'title' => "Delete",
+    'access arguments' => array('administer storage'),
+    'type' => MENU_LOCAL_TASK,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('storage_class_delete_form', 4),
+    'weight' => 2,
+    'file' => 'class.admin.inc',
+  );
+
+  $items['admin/structure/storage/class/%storage_class_menu/add'] = array(
+    'title' => "Add container",
+    'access arguments' => array('administer storage'),
+    'type' => MENU_LOCAL_ACTION,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('storage_class_add_container_form', 4),
+    'weight' => 2,
+    'file' => 'class.admin.inc',
+  );
+
+  $items['admin/structure/storage/create-container'] = array(
+    'title' => "Create container",
+    'access arguments' => array('administer storage'),
+    'type' => MENU_LOCAL_ACTION,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('storage_create_container_form'),
+    'weight' => 1,
+    'file' => 'container.admin.inc',
+  );
+
+  $items['admin/structure/storage/container/%storage_container_menu'] = array(
+    'title callback' => 'storage_container_title',
+    'title arguments' => array(4),
+    'access arguments' => array('administer storage'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('storage_container_form', 4),
+    'file' => 'container.admin.inc',
+  );
+
+  $items['admin/structure/storage/container/%storage_container_menu/view'] = array(
+    'title' => "View",
+    'access arguments' => array('administer storage'),
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => 0,
+    'file' => 'container.admin.inc',
+  );
+
+  $items['admin/structure/storage/container/%storage_container_menu/edit'] = array(
+    'title' => "Edit",
+    'access arguments' => array('administer storage'),
+    'type' => MENU_LOCAL_TASK,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('storage_container_edit_form', 4),
+    'weight' => 2,
+    'file' => 'container.admin.inc',
+  );
+
+  $items['admin/structure/storage/container/%storage_container_menu/destroy'] = array(
+    'title' => "Destroy",
+    'access arguments' => array('administer storage'),
+    'type' => MENU_LOCAL_TASK,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('storage_container_destroy_form', 4),
+    'weight' => 3,
+    'file' => 'container.admin.inc',
+  );
+
+  $items['admin/structure/storage/container/%storage_container_menu/suspend'] = array(
+    'access arguments' => array('administer storage'),
+    'type' => MENU_CALLBACK,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('storage_container_suspend_form', 4),
+    'file' => 'container.admin.inc',
+  );
+
+  $items['admin/structure/storage/container/%storage_container_menu/unsuspend'] = array(
+    'access arguments' => array('administer storage'),
+    'type' => MENU_CALLBACK,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('storage_container_unsuspend_form', 4),
+    'file' => 'container.admin.inc',
+  );
+
+  return $items;
+}
+
+
+/**
+ * Loads a storage.
+ *
+ * @param $storage_id
+ *   The storage_id of the storage to be loaded.
+ *
+ * @return
+ *   The storage.
+ *
+ * @throws StorageException
+ *   If the storage cannot be loaded.
+ */
+function storage_load($storage_id) {
+
+  return new Storage($storage_id);
+}
+
+
+/**
+ * Loads a storage for the menu system.
+ *
+ * @param $storage_id
+ *   The storage_id of the storage to be loaded.
+ *
+ * @return
+ *   The storage or FALSE if it could not be loaded.
+ */
+function storage_menu_load($storage_id) {
+
+  try {
+    return storage_load($storage_id);
+  }
+  catch (StorageException $e) {
+    return FALSE;
+  }
+}
+
+/**
+ * Loads a storage service.
+ *
+ * @param $srvice_id
+ *   The service_id of the service to be loaded.
+ *
+ * @return
+ *   The storage service.
+ */
+function storage_service_load($service_id) {
+
+  return new StorageService($service_id);
+}
+
+
+function storage_service_title(StorageService $service) {
+
+  return check_plain($service->name);
+}
+
+
+/**
+ * Loads a storage container.
+ *
+ * @param $container_id
+ *   The container_id of the container to be loaded.
+ *
+ * @return
+ *   The storage container or FALSE if it could not be loaded.
+ *
+ * @throws StorageException
+ *   If the storage container cannot be loaded.
+ */
+function storage_container_load($container_id) {
+
+  $fields = db_select('storage_container')
+    ->fields('storage_container')
+    ->condition('container_id', $container_id)
+    ->execute()
+    ->fetchAssoc();
+
+  if (!$fields) {
+    throw new StorageException();
+  }
+
+  return storage_container_new($fields);
+}
+
+
+/**
+ * Loads a storage container for the menu system.
+ *
+ * @param $container_id
+ *   The container_id of the container to be loaded.
+ *
+ * @return
+ *   The storage container.
+ */
+function storage_container_menu_load($container_id) {
+
+  try {
+    return storage_container_load($container_id);
+  }
+  catch (StorageException $e) {
+    return FALSE;
+  }
+}
+
+
+function storage_container_new(array $fields, $unserialize = TRUE) {
+
+  if ($unserialize) {
+    $fields['settings'] = unserialize($fields['settings']);
+  }
+  
+  $class = storage_container_class($fields['service_id']);
+  return new $class($fields);
+}
+
+
+function storage_container_title(StorageContainerInterface $container) {
+
+  return check_plain($container->name());
+}
+
+
+/**
+ * Loads a storage class.
+ *
+ * @param $class_id
+ *   The class_id of the class to be loaded.
+ *
+ * @return
+ *   The storage class.
+ *
+ * @throws StorageException
+ *   If the storage class cannot be loaded.
+ */
+function storage_class_load($class_id) {
+
+  return new StorageClass($class_id);
+}
+
+
+/**
+ * Loads a storage class for the menu system.
+ *
+ * @param $class_id
+ *   The class_id of the class to be loaded.
+ *
+ * @return
+ *   The storage class or FALSE if it could not be loaded.
+ */
+function storage_class_menu_load($class_id) {
+
+  try {
+    return storage_class_load($class_id);
+  }
+  catch (StorageException $e) {
+    return FALSE;
+  }
+}
+
+
+function storage_class_title(StorageClass $class) {
+
+  return check_plain($class->name);
+}
+
+function storage_unserialize_class_options(&$options) {
+  $options = unserialize($options);
+  $options += array(
+    'redirect' => FALSE,
+    'serve_source_uri' => FALSE,
+    'data_uri' => FALSE,
+    'initial_container_id' => NULL,
+  );
+}
+
+/**
+ * Creates an object for a class selector.
+ */
+function storage_selector($arg0, $arg1 = NULL) {
+
+  return new StorageSelector($arg0, $arg1);
+}
+
+/**
+ * Implements hook_storage_services().
+ */
+function storage_storage_services() {
+
+  $services = array(
+    'db' => array(
+      'name' => t('Database'),
+      'class' => 'StorageDB',
+      'serve' => FALSE,
+    ),
+    'fs' => array(
+      'name' => t('Filesystem'),
+      'class' => 'StorageFS',
+      'htaccess' => TRUE,
+    ),
+    'ftp' => array(
+      'name' => t('FTP'),
+      'class' => 'StorageFTP',
+      'htaccess' => TRUE,
+    ),
+    'rackspace' => array(
+      'name' => t('Rackspace Cloud Files'),
+      'class' => 'StorageRackspace',
+    ),
+    's3' => array(
+      'name' => t("Amazon S3"),
+      'class' => 'StorageS3',
+      'copy' => TRUE,
+      'serve_secure' => TRUE,
+    ),
+  );
+
+  return $services;
+}
+
+/**
+ * Implements hook_libraries_info().
+ */
+function storage_libraries_info() {
+  $libraries = array();
+
+  $libraries['php-cloudfiles'] = array(
+    'name' => 'php-cloudfiles',
+    'vendor url' => 'https://github.com/rackspace/php-cloudfiles',
+    'download url' => 'https://github.com/rackspace/php-cloudfiles/downloads',
+    'version' => 'whatever',
+    'files' => array(
+      'php' => array(
+        'cloudfiles.php',
+      ),
+    ),
+  );
+
+  return $libraries;
+}
+
+/**
+ * Implements hook_storage_service_check_SERVICE_ID().
+ */
+function storage_storage_service_check_rackspace() {
+  $items = array();
+
+  if (module_exists('libraries') && function_exists('libraries_detect')) {
+    $library = libraries_detect('php-cloudfiles');
+
+    if ($library['installed']) {
+      return;
+    }
+  }
+  else {
+    $items[] = t("Enable <a href=\"!url\">Libraries API</a> 7.x-2.x", 
+      array('!url' => 'http://drupal.org/project/libraries')
+    );
+  }
+
+  $message = t("Download <a href=\"!download_url\" target=\"_blank\">php-cloudfiles</a>, decompress it, rename the directory to <em>php-cloudfiles</em> and put it in <em>sites/all/libraries</em>.<br />Alternatively you can use <a href=\"http://git-scm.com/\" target=\"_blank\">Git</a>:", array('!download_url' => 'https://github.com/rackspace/php-cloudfiles/downloads'));
+  $message .= '<br /><code>git clone git://github.com/rackspace/php-cloudfiles.git</code>';
+
+  $items[] = $message;
+
+  throw new StorageException(theme('item_list', array('items' => $items)));
+}
+
+function storage_service_info() {
+  $services = array();
+
+  foreach (module_implements('storage_services') as $module) { 
+    foreach (module_invoke($module, 'storage_services') as $name => $info) {
+      // Add defaults.
+      $info += array(
+        'htaccess' => FALSE,
+        'copy' => FALSE,
+        'serve' => TRUE,
+        'serve_secure' => FALSE,
+      );
+
+      $services[$module . ':' . $name] = $info;
+    }
+  }
+
+  return $services;
+}
+
+
+function storage_container_class($service_id) {
+  $service = storage_service_load($service_id);
+  return $service->class;
+}
+
+
+function storage_serve(Storage $storage) {
+  $storage->serve();
+}
+
+
+/**
+ * Determine whether the user has access to a storage.
+ *
+ * @param $storage
+ *   The storage that access is being checked for.
+ * @return
+ *   Boolean TRUE if the current user has access to the storage.
+ */
+function storage_access(Storage $storage) {
+  return $storage->access();
+}
+
+
+function _storage_service_unavailable() {
+  drupal_deliver_page(MENU_SITE_OFFLINE);
+}
+
+
+function storage_mime_detect($uri, $filename) {
+  $filepath = drupal_realpath($uri);
+  $mime = FALSE;
+
+  if (extension_loaded('fileinfo')) {
+    $finfo = &drupal_static(__FUNCTION__);
+
+    if (!isset($finfo)) {
+      $finfo = @finfo_open(FILEINFO_MIME);
+    }
+
+    if ($finfo !== FALSE) {
+      $mime = finfo_file($finfo, $filepath);
+    }
+  }
+
+  if ($mime == '' || (strtok($mime, ';') == 'application/octet-stream')) {
+    // On OSX the -i switch is -I, so if we use the long flags everyone is
+    // happy.
+    $command = 'file --brief --mime ' . escapeshellarg($filepath);
+    $mime = trim(exec($command, $output, $result));
+
+    if ($result !== 0) {
+      $mime = FALSE;
+    }
+  }
+
+  if ($mime == '' || (strtok($mime, ';') == 'application/octet-stream')) {
+    $mime = file_get_mimetype($filename);
+  }
+
+  return ($mime == '') ? 'application/octet-stream; charset=binary' : $mime;
+}
+
+function _storage_file_id($uri, $filename = NULL, &$new_file = NULL) {
+  $fileinfo = @stat($uri);
+
+  if (!$fileinfo) {
+    throw new StorageException();
+  }
+
+  $whirlpool = hash_file('whirlpool', $uri, TRUE);
+  if (!$filename) {
+    $filename = basename(file_uri_target($uri));
+  }
+
+  $transaction = db_transaction();
+  $file_id = db_select('storage_file')
+    ->fields('storage_file', array('file_id'))
+    ->condition('whirlpool', $whirlpool)
+    ->condition('filename', $filename)
+    ->execute()
+    ->fetchField();
+
+  if ($file_id === FALSE) {
+
+    $file = array(
+      'whirlpool' => $whirlpool,
+      'filename' => $filename,
+      'size' => $fileinfo['size'],
+      'mimetype' => storage_mime_detect($uri, $filename),
+      'md5' => hash_file('md5', $uri, TRUE),
+    );
+
+    drupal_write_record('storage_file', $file);
+
+    $file_id = $file['file_id'];
+    $new_file = TRUE;
+  }
+
+  return $file_id;
+}
+
+
+function _storage_acquire_from_url($url) {
+
+  $temp_uri = new StorageTempURI();
+  $fp = fopen($temp_uri, "w");
+
+  $options = array(
+    CURLOPT_FOLLOWLOCATION => TRUE,
+    CURLOPT_AUTOREFERER => TRUE,
+    CURLOPT_CONNECTTIMEOUT => 30,
+    CURLOPT_LOW_SPEED_LIMIT => 256,
+    CURLOPT_LOW_SPEED_TIME => 60,
+    CURLOPT_FILE => $fp
+  );
+
+  $ch = curl_init(str_replace(' ', '+', $url));   // this seems to keep everyone happy
+  curl_setopt_array($ch, $options);
+  $result = curl_exec($ch);
+  fclose ($fp);
+  $info = curl_getinfo($ch);
+  curl_close($ch);
+  
+  switch ((int)($info['http_code'] / 100)) {
+  
+    case 2:
+      return $temp_uri;
+      
+    case 4:
+      return FALSE;         // hard failure
+      
+    default:
+      return NULL;          // soft failure
+  }
+}
+
+
+function _storage_delete_file_if_unrequired($file_id) {
+  $txn = db_transaction();
+  
+  // Do any storages use this file?
+  if (db_select('storage')
+    ->condition('file_id', $file_id)
+    ->countQuery()
+    ->execute()
+    ->fetchField())
+  {
+    return;
+  }
+  
+  db_delete('storage_file')
+    ->condition('file_id', $file_id)
+    ->execute();
+}
+
+
+function _storage_get_service_names() {
+  $names = array();
+
+  foreach (storage_service_info() as $service_id => $info) {
+    $names[$service_id] = $info['name'];
+  }
+
+  asort($names);
+
+  return $names;
+}
+
+/**
+ * Formats a byte count into a human-readable representation.
+ *
+ * See http://en.wikipedia.org/wiki/Kilobyte for more information.
+ *
+ * @param $count
+ *   An integer byte count.
+ *
+ * @return
+ *   A human readable representation of the byte count.
+ */
+function storage_format_byte_count($count) {
+  $units = array('B', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB');
+
+  foreach ($units as $unit) {
+    if ($count < 1000) {
+      break;
+    }
+
+    $count /= 1000;
+  }
+
+  return round($count, 2) . ' ' . $unit;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function storage_theme($existing, $type, $theme, $path) {
+
+  return array(
+    'storage_class_edit_form' => array(
+      'render element' => 'form',
+    ),
+    'storage_info_table' => array(
+      'render element' => 'info',
+    ),
+  );
+}
+
+
+function theme_storage_info_table(array $variables) {
+  $rows = array();
+
+  foreach ($variables['info'] as $key => $value) {
+    if ($value === '') {
+      continue;
+    }
+
+    $rows[] = array(
+      array(
+        'data' => $key . ':',
+        'style' => 'font-weight: bold',
+      ),
+      $value,
+    );
+  }
+  
+  return theme('table', array(
+    'rows' => $rows, 
+    'attributes' => array('style' => 'width: auto;')
+  ));
+}
+
+
+class StorageLock {
+  public $name;
+  private $id;
+
+  public function __construct($name) {
+    global $databases;
+    $this->name = $name;
+    $this->id = $databases['default']['default']['database'] . ':storage:' . $name;
+
+    $success = db_query('SELECT GET_LOCK(:name, 86400)', array(':name' => $this->id))
+      ->fetchField();
+
+    if (!$success) {
+      throw new StorageException();
+    }
+  }
+
+  public function __destruct() {
+    db_query('DO RELEASE_LOCK(:name)', array(':name' => $this->id));
+  }
+
+  public function __toString() {
+    return $this->name;
+  }
+}
+
+class StorageTempURI {
+  private $uri;
+
+  /**
+   * @throws StorageException
+   */
+  public function __construct() {
+    if (!$this->uri = drupal_tempnam('temporary://', 'storage-')) {
+      throw new StorageException();
+    }
+  }
+
+  public function __destruct() {
+    drupal_unlink($this->uri);
+  }
+
+  public function __toString() {
+    return $this->uri;
+  }
+}
+
+function storage_new_local_storage_path() {
+
+  return file_create_filename('storage', variable_get('file_public_path', conf_path() . '/files'));
+}
+
+function storage_test_theme_image_data_uri() {
+  $test_uri = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO9TXL0Y4OHwAAAABJRU5ErkJggg==';
+
+  return url(file_create_url($test_uri)) == $test_uri;
+}
+
+function storage_data_uri_doc_link() {
+  $data_uri_doc_url = 'http://drupal.org/node/1405018';
+  return l($data_uri_doc_url, $data_uri_doc_url,
+    array('attributes' => array('target' => '_blank')));
+}
+
+function storage_is_request_https() {
+  return (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on');
+}
+
+/**
+ * Implements hook_cron().
+ */
+function storage_cron() {
+
+  $path = drupal_get_path('module', 'storage');
+  require_once DRUPAL_ROOT . '/' . $path . '/cron.inc';
+
+  _storage_cron();
+}
+
+
+/**
+ * Implements hook_modules_uninstalled().
+ */
+function storage_modules_uninstalled($modules) {
+
+  foreach ($modules as $module) {
+
+    // Find this module's selectors.
+    $selector_ids = db_select('storage_selector')
+      ->fields('storage_selector', array('selector_id'))
+      ->condition('selector_id', $module . ':%', 'LIKE')
+      ->distinct()
+      ->execute()
+      ->fetchCol();
+
+    // Destroy them.
+    foreach ($selector_ids as $selector_id) {
+      storage_selector($selector_id)->destroy();
+    }
+  }
+}
+
