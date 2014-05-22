@@ -1,12 +1,14 @@
 ---
 applications:
 - name: drupal
-  memory: 256M 
-  instances: 2
+  memory: 512m 
+  instances: 1
   host: drupal
   domain: cloudfoundry.dyndns.org
   path: .
   services:
   - drupal-db
-#  - drupal-varnish
-#  - drupal-memcached
+  - drupal-s3
+  - drupal-memcached
+  env:
+    VARNISH_MEMORY_LIMIT: 256m
