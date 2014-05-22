@@ -1,5 +1,0 @@
-{
-    "PHP_EXTENSIONS": [ "bz2", "zlib", "curl", "mcrypt", "gd", "memcache"],
-    "DOWNLOAD_URL": "http://10.0.0.57",
-    "PHP_MODULES": [ "pear"]
-}
