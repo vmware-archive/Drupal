@@ -1,9 +1,0 @@
-<?php
-
-/**
- * Implements hook_install().
- */
-function storage_audit_test_install() {
-
-  storage_selector('storage_audit_test', 'test')->create();
-}
