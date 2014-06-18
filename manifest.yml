@@ -8,7 +8,6 @@ applications:
   path: .
   services:
   - drupal-db
-  - drupal-s3
-  - drupal-memcached
+  - s3
   env:
     VARNISH_MEMORY_LIMIT: 256m

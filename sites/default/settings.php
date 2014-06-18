@@ -3,19 +3,41 @@
 /**
 * Pivotal Cloudfoundry customizations 
 */
+
+# Pull credentials out of VCAP_SERVICES env
 $services = getenv("VCAP_SERVICES");
 $services_json = json_decode($services,true);
-$mysql_config = $services_json["p-mysql"][0]["credentials"];
-$databases['default']['default'] = array(
-'driver' => 'mysql',
-'database' => $mysql_config["name"],
-'username' => $mysql_config["username"],
-'password' => $mysql_config["password"],
-'host' => $mysql_config["hostname"],
-'port' =>  $mysql_config["port"],
-'prefix' => 'main_',
-'collation' => 'utf8_general_ci',
-);
+if (isset($services_json))	{	
+	
+	#MySQL
+	$mysql_config = $services_json["p-mysql"][0]["credentials"];
+	$databases['default']['default'] = array(
+	  'driver' => 'mysql',
+	  'database' => $mysql_config["name"],
+	  'username' => $mysql_config["username"],
+	  'password' => $mysql_config["password"],
+	  'host' => $mysql_config["hostname"],
+	  'port' =>  $mysql_config["port"],
+	  'prefix' => 'main_',
+	  'collation' => 'utf8_general_ci',
+	);
+	
+	#S3 API
+	$s3_config = $services_json["p-riakcs"][0]["credentials"];
+	if (isset($s3_config))	{	
+		$conf['awssdk2_access_key'] = $s3_config["access_key_id"];
+		$conf['awssdk2_secret_key'] = $s3_config["secret_access_key"];
+		
+		$s3_url = parse_url($s3_config["uri"]);		
+		$conf['s3fs_bucket'] = ltrim($s3_url['path'],"/");
+		#force http because of self-signed certs for now
+		$full_host = "http://" . substr($s3_url['host'], 9); #strip off 'p-riakcs.' from URL
+		$conf['s3fs_hostname'] = $full_host;
+		$conf['s3fs_use_customhost'] = TRUE;	
+		$conf['s3fs_ignore_cache'] = TRUE;
+	}
+	
+}
 
 
 
@@ -28,14 +50,12 @@ if (isset($services_json["user-provided"]))	{
 			$varnish_creds = $ups["credentials"];
 		} else if ($ups_name == "drupal-memcached") {
 			$memcached_creds = $ups["credentials"];
-		} else if ($ups_name == "drupal-s3") {
-			$s3_creds = $ups["credentials"];
 		}
 	}
 }
 
 /**
-* Varnish configuration
+* Varnish configuration if you are using a separate varnish tier
 **/
 if (isset($varnish_creds))	{
 	$conf['cache_backends'][] = 'sites/all/modules/varnish/varnish.cache.inc';
@@ -69,28 +89,6 @@ if (isset($memcached_creds))	{
 	  'cache' => 'cluster1'
 	);
 }
-
-/**
-* S3 configuration
-**/
-if (isset($s3_creds))	{	
-	$conf['awssdk2_access_key'] = $s3_creds["access_key"];
-	$conf['awssdk2_secret_key'] = $s3_creds["secret_key"];
-	$conf['s3fs_bucket'] = $s3_creds["bucket"];
-	
-	if (isset($s3_creds["hostname"])) {
-		$conf['s3fs_hostname'] = $s3_creds["hostname"];
-		$conf['s3fs_use_customhost'] = TRUE;
-	}
-	
-	if (isset($s3_creds["domain"])) {
-		$conf['s3fs_use_cname'] = TRUE;
-		$conf['s3fs_domain'] = $s3_creds["domain"];
-	}
-	
-	$conf['s3fs_use_https'] = $s3_creds["https"];
-}
-
 
 /**
  * Access control for update.php script.
