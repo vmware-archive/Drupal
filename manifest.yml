@@ -1,13 +1,18 @@
 ---
+instances: 1
+memory: 512m
 applications:
-- name: drupal
-  memory: 512m 
-  instances: 1
-  host: drupal
-  domain: cloudfoundry.dyndns.org
-  path: .
-  services:
-  - drupal-db
-  - s3
-  env:
-    VARNISH_MEMORY_LIMIT: 256m
+  - name: drupal 
+    host: drupal
+    path: drupal-7.28
+    services:
+      - drupal-db
+      - drupal-s3
+    env:
+      VARNISH_MEMORY_LIMIT: 256m
+  - name: s3
+    host: s3
+    path: proxy
+    env:
+      S3_BUCKET: service-instance-423086ed-9167-4026-add2-d734bfb0b2e5
+      CF_FQDN: cloudfoundry.dyndns.org
