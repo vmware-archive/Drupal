@@ -1,6 +1,6 @@
 
 Pivotal CF + Drupal
-================================
+===================
 
 Introduction
 ------------
@@ -12,13 +12,13 @@ Drupal is an open source content management platform supporting a variety of web
 Installation
 ------------
 
-Installation Prerequisites:
+###Installation Prerequisites
  * Pivotal CF v1.2 or greater
  * Pivotal RiakCS service deployed
  * Pivotal MySQL service deployed
  * PHP/Varnish buildpack installed, found here - https://github.com/azwickey-pivotal/cf-php-build-pack
  
-Installation instructions:
+###Installation instructions:
  * Create services
  * update manfests
  * Push applications
