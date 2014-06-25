@@ -12,9 +12,18 @@ Drupal is an open source content management platform supporting a variety of web
 Installation
 ------------
 
-Installation instructions...
-
-Advanced Installation
-------------
-
-Advanced installation instructions...
+Installation Prerequisites:
+ * Pivotal CF v1.2 or greater
+ * Pivotal RiakCS service deployed
+ * Pivotal MySQL service deployed
+ * PHP/Varnish buildpack installed, found here - https://github.com/azwickey-pivotal/cf-php-build-pack
+ 
+Installation instructions:
+ * Create services
+ * update manfests
+ * Push applications
+ * Updated proxy variable
+ * Add bucket route
+ * Configure S3FS
+ * Configure filesystem and content type
+ * Test
