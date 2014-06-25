@@ -14,5 +14,5 @@ applications:
     host: s3
     path: proxy
     env:
-      S3_BUCKET: //YOUR S3 BUCKET HERE
-      CF_FQDN: //YOUR CF DOMAIN HERE
+      S3_BUCKET: YOUR S3 BUCKET HERE
+      CF_FQDN: YOUR CF DOMAIN HERE
