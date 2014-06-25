@@ -14,5 +14,5 @@ applications:
     host: s3
     path: proxy
     env:
-      S3_BUCKET: service-instance-423086ed-9167-4026-add2-d734bfb0b2e5
-      CF_FQDN: cloudfoundry.dyndns.org
+      S3_BUCKET: //YOUR S3 BUCKET HERE
+      CF_FQDN: //YOUR CF DOMAIN HERE
