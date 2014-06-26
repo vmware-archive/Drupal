@@ -57,6 +57,6 @@ Installation
   ```
   $ cf map-route s3 cloudfoundry.dyndns.org -n service-instance-423086ed-9167-4026-add2-d734bfb0b2e5
   ```
- * Log into Drupal and enable the S3FS module from the modules menu.  Werify that the S3FS Drupal module can connect to Riak-CS by navigating to Configuration < S3 File System Settings.
+ * Log into Drupal and enable the S3FS module from the modules menu.  Verify that the S3FS Drupal module can connect to Riak-CS by navigating to Configuration < S3 File System Settings.
  * Configure filesystem default download type to "Amazon Simple Storage Service".  
  * Configure a Drupal content type the contains a field that must be stored on a filesystem, such as an image field, to use "S3 File System" as the defaul tupload location.
