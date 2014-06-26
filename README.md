@@ -59,4 +59,4 @@ Installation
   ```
  * Log into Drupal and enable the S3FS module from the modules menu.  Verify that the S3FS Drupal module can connect to Riak-CS by navigating to Configuration < S3 File System Settings.
  * Configure filesystem default download type to "Amazon Simple Storage Service".  
- * Configure a Drupal content type the contains a field that must be stored on a filesystem, such as an image field, to use "S3 File System" as the defaul tupload location.
+ * Configure a Drupal content type the contains a field that must be stored on a filesystem, such as an image field, to use "S3 File System" as the default upload location.
