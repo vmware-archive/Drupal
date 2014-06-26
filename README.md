@@ -9,8 +9,7 @@ Pivotal CF™ is the leading enterprise PaaS, powered by Cloud Foundry. It deliv
 
 Drupal is an open source content management platform supporting a variety of websites ranging from personal weblogs to large community-driven websites. For more information, see the Drupal website at http://drupal.org/, and join the Drupal community at http://drupal.org/community.
 
-[[File:arch.png]]
-
+![Drupal Architecture](arch.png "Drupal Architecture")
 Installation
 ------------
 
