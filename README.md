@@ -19,7 +19,11 @@ Installation
  * PHP/Varnish buildpack installed, found here - https://github.com/azwickey-pivotal/cf-php-build-pack
  
 ###Installation instructions:
- * Create services
+ * Create services required by Drupal
+ ```
+  $ cf create-service p-mysql 100mb-dev drupal-db
+  $ cf create-service p-riakcs developer drupal-s3
+  ```
  * update manfests
  * Push applications
  * Updated proxy variable
