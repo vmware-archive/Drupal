@@ -41,11 +41,11 @@ Installation
     
  Next, input this value into S3_BUCKET env variable in the deployment manifest, manifest.yml.  Additionally, update the CF_FQND variable to reflect your cloudfoundry domain.
  
-    '''
+```
     env:
       S3_BUCKET: YOUR S3 BUCKET HERE
       CF_FQDN: YOUR CF DOMAIN HERE
-    '''
+```
  * Updated proxy variable
  * Add bucket route
  * Configure S3FS
