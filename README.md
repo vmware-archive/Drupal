@@ -46,6 +46,11 @@ Installation
       S3_BUCKET: YOUR S3 BUCKET HERE
       CF_FQDN: YOUR CF DOMAIN HERE
    ```
+  * Execute a 2nd application push so that your updated deployment manifest variables take affect.
+ 
+  ```
+  $ cf push
+  ```
  * Drupal must address Riak-CS with the format of http://$BUCKET_NAME.$CF_DOMAIN.  In order to support this format we must add a Cloudfoundry route to the s3 proxy application that represents our bucket name.
   
   ```
