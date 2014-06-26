@@ -14,7 +14,7 @@ Installation
 
 ###Installation Prerequisites
  * Pivotal CF v1.2 or greater
- * Pivotal RiakCS service deployed
+ * Pivotal Riak-CS service deployed
  * Pivotal MySQL service deployed
  * PHP/Varnish buildpack installed, found here - https://github.com/azwickey-pivotal/cf-php-build-pack
  
@@ -41,13 +41,16 @@ Installation
     
  Next, input this value into S3_BUCKET env variable in the deployment manifest, manifest.yml.  Additionally, update the CF_FQND variable to reflect your cloudfoundry domain.
  
-```
+   ```
     env:
       S3_BUCKET: YOUR S3 BUCKET HERE
       CF_FQDN: YOUR CF DOMAIN HERE
-```
- * Updated proxy variable
- * Add bucket route
- * Configure S3FS
- * Configure filesystem and content type
- * Test
+   ```
+ * Drupal must address Riak-CS with the format of http://$BUCKET_NAME.$CF_DOMAIN.  In order to support this format we must add a Cloudfoundry route to the s3 proxy application that represents our bucket name.
+  
+  ```
+  $ cf map-route s3 cloudfoundry.dyndns.org -n service-instance-423086ed-9167-4026-add2-d734bfb0b2e5
+  ```
+ * Log into Drupal and enable the S3FS module from the modules menu.  Werify that the S3FS Drupal module can connect to Riak-CS by navigating to Configuration < S3 File System Settings.
+ * Configure filesystem default download type to "Amazon Simple Storage Service".  
+ * Configure a Drupal content type the contains a field that must be stored on a filesystem, such as an image field, to use "S3 File System" as the defaul tupload location.
