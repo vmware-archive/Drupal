@@ -23,20 +23,21 @@ if (isset($services_json))	{
 	);
 	
 	#S3 API
-	$s3_config = $services_json["p-riakcs"][0]["credentials"];
-	if (isset($s3_config))	{	
-		$conf['awssdk2_access_key'] = $s3_config["access_key_id"];
-		$conf['awssdk2_secret_key'] = $s3_config["secret_access_key"];
+	if (isset($services_json["p-riakcs"]))	{	
+		$s3_config = $services_json["p-riakcs"][0]["credentials"];
+		if (isset($s3_config))	{	
+			$conf['awssdk2_access_key'] = $s3_config["access_key_id"];
+			$conf['awssdk2_secret_key'] = $s3_config["secret_access_key"];
 		
-		$s3_url = parse_url($s3_config["uri"]);		
-		$conf['s3fs_bucket'] = ltrim($s3_url['path'],"/");
-		#force http because of self-signed certs for now
-		$full_host = "http://" . substr($s3_url['host'], 9); #strip off 'p-riakcs.' from URL
-		$conf['s3fs_hostname'] = $full_host;
-		$conf['s3fs_use_customhost'] = TRUE;	
-		$conf['s3fs_ignore_cache'] = TRUE;
+			$s3_url = parse_url($s3_config["uri"]);		
+			$conf['s3fs_bucket'] = ltrim($s3_url['path'],"/");
+			#force http because of self-signed certs for now
+			$full_host = "http://" . substr($s3_url['host'], 9); #strip off 'p-riakcs.' from URL
+			$conf['s3fs_hostname'] = $full_host;
+			$conf['s3fs_use_customhost'] = TRUE;	
+			$conf['s3fs_ignore_cache'] = TRUE;
+		}
 	}
-	
 }
 
 
