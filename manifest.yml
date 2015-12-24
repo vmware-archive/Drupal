@@ -11,8 +11,8 @@ applications:
     env:
       VARNISH_MEMORY_LIMIT: 256m
   - name: s3
-    random-route: true
+    host: s3
     path: proxy
     env:
-      S3_BUCKET: service-instance-b1f3e3e9-d568-4085-8f6f-4e1a7249f1fb
-      CF_FQDN: cfapps.vca.express-scripts.com
+      S3_BUCKET: YOUR S3 BUCKET HERE
+      CF_FQDN: YOUR CF DOMAIN HERE
