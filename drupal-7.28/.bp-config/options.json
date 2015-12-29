@@ -1,7 +1,6 @@
 {
-    "PHP_EXTENSIONS": [ "bz2", "zlib", "curl", "mcrypt", "gd", "memcache", "ldap" ],
-    "DOWNLOAD_URL": "http://drupal-assets.cfapps.io/binaries/",
-    "HTTPD_VERSION": "2.4.7",
-    "PHP_VERSION": "5.4.27",
+    "PHP_EXTENSIONS": [ "bz2", "zlib", "curl", "mcrypt", "gd", "memcache", "ldap", "pdo", "pdo_mysql", "mbstring"],
+    "HTTPD_VERSION": "2.4.17",
+    "PHP_VERSION": "{PHP_56_LATEST}",
     "PHP_MODULES": [ "pear"]
 }
